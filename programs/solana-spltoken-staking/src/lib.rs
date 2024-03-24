@@ -1,24 +1,21 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
-use anchor_spl::associated_token::{AssociatedToken};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::mem::size_of;
 
-declare_id!("3fKWJqNzcLmrDVETM7AELXuPd1N21syu8EsoaUgnoLa4");
+declare_id!("9YLTnX9cPzkJZM8eCF9kZQmqtz7eAHXdBFFs3yo8Johu");
 
-const YEAR_DURATION: u128 = 365*24*3600;
-const APY: u128 = 50;//this mean 50 %
-
+const YEAR_DURATION: u128 = 60;
+const APY: u128 = 15; //this mean 15 %
+const LOCK_TIME: u128 = 120;
 
 #[program]
 pub mod solana_spltoken_staking {
     use super::*;
 
-    pub fn create_state(
-        _ctx: Context<CreateState>,
-        token_per_second: u64,
-    ) -> Result<()> {
+    pub fn create_state(_ctx: Context<CreateState>, token_per_second: u64) -> Result<()> {
         let state = &mut _ctx.accounts.state;
         state.authority = _ctx.accounts.authority.key();
         state.bump = _ctx.bumps.state;
@@ -87,14 +84,17 @@ pub mod solana_spltoken_staking {
         let state = &mut _ctx.accounts.state;
         let user = &mut _ctx.accounts.user;
         let pool = &mut _ctx.accounts.pool;
-        let referral_user = &mut _ctx.accounts.referral_user;
+        // let referral_user = &mut _ctx.accounts.referral_user;
 
-        let deposit_amount = amount.checked_mul(95).unwrap().checked_div(100).unwrap();
-        let referral_amount = u128::from(amount.checked_mul(5).unwrap().checked_div(100).unwrap());
-        user.amount = user.amount.checked_add(deposit_amount).unwrap();
+        // let deposit_amount = amount.checked_mul(95).unwrap().checked_div(100).unwrap();
+        // let referral_amount = u128::from(amount.checked_mul(5).unwrap().checked_div(100).unwrap());
+        user.amount = user.amount.checked_add(amount).unwrap();
         pool.amount = pool.amount.checked_add(amount).unwrap();
 
-        referral_user.extra_reward = referral_user.extra_reward.checked_add(referral_amount).unwrap();
+        // referral_user.extra_reward = referral_user
+        //     .extra_reward
+        //     .checked_add(referral_amount)
+        //     .unwrap();
         user.last_stake_time = _ctx.accounts.clock.unix_timestamp;
 
         let cpi_accounts = Transfer {
@@ -124,13 +124,18 @@ pub mod solana_spltoken_staking {
         require!(user.amount >= amount, ErrorCode::UnstakeOverAmount);
         require!(
             user.last_stake_time
-                .checked_add(user.lock_duration)
+                .checked_add(LOCK_TIME.try_into().unwrap())
                 .unwrap()
                 <= _ctx.accounts.clock.unix_timestamp,
             ErrorCode::UnderLocked
         );
 
-        let seconds = _ctx.accounts.clock.unix_timestamp.checked_sub(user.last_stake_time).unwrap();
+        let seconds = _ctx
+            .accounts
+            .clock
+            .unix_timestamp
+            .checked_sub(user.last_stake_time)
+            .unwrap();
 
         let total_reward_amount: u128 = u128::from(user.amount)
             .checked_mul(APY)
@@ -141,11 +146,8 @@ pub mod solana_spltoken_staking {
             .unwrap()
             .checked_div(YEAR_DURATION)
             .unwrap();
-        
-        user.reward_amount = user.reward_amount
-            .checked_add(total_reward_amount)
-            .unwrap();
 
+        user.reward_amount = user.reward_amount.checked_add(total_reward_amount).unwrap();
 
         user.last_stake_time = _ctx.accounts.clock.unix_timestamp;
         user.amount = user.amount.checked_sub(amount).unwrap();
@@ -179,7 +181,12 @@ pub mod solana_spltoken_staking {
         let pool = &mut _ctx.accounts.pool;
         let user = &mut _ctx.accounts.user;
 
-        let seconds =  _ctx.accounts.clock.unix_timestamp.checked_sub(user.last_stake_time).unwrap();
+        let seconds = _ctx
+            .accounts
+            .clock
+            .unix_timestamp
+            .checked_sub(user.last_stake_time)
+            .unwrap();
         let until_new_reward_amount: u128 = u128::from(user.amount)
             .checked_mul(APY)
             .unwrap()
@@ -190,7 +197,14 @@ pub mod solana_spltoken_staking {
             .checked_div(YEAR_DURATION)
             .unwrap();
 
-        let total_reward = user.reward_amount.checked_add(user.extra_reward).unwrap().checked_add(until_new_reward_amount).unwrap().try_into().unwrap();
+        let total_reward = user
+            .reward_amount
+            .checked_add(user.extra_reward)
+            .unwrap()
+            .checked_add(until_new_reward_amount)
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         let cpi_accounts = Transfer {
             from: _ctx.accounts.reward_vault.to_account_info(),
@@ -246,7 +260,7 @@ pub struct CreateState<'info> {
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub clock: Sysvar<'info, Clock>,
-    pub rent: Sysvar<'info, Rent>
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -331,10 +345,10 @@ pub struct Stake<'info> {
     #[account(mut, constraint = user_vault.owner == authority.key())]
     pub user_vault: Box<Account<'info, TokenAccount>>,
     /// CHECK:
-    #[account(mut)]
-    pub referral: AccountInfo<'info>,
-    #[account(mut, seeds = [pool.key().as_ref(), referral.key().as_ref()], bump = referral_user.bump, has_one = pool)]
-    pub referral_user: Account<'info, FarmPoolUserAccount>,
+    // #[account(mut)]
+    // pub referral: AccountInfo<'info>,
+    // #[account(mut, seeds = [pool.key().as_ref(), referral.key().as_ref()], bump = referral_user.bump, has_one = pool)]
+    // pub referral_user: Account<'info, FarmPoolUserAccount>,
     pub system_program: Program<'info, System>,
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>,
@@ -441,10 +455,7 @@ pub struct FarmPoolUserAccount {
 }
 
 impl FarmPoolUserAccount {
-    fn calculate_reward_amount<'info>(
-        &mut self,
-        pool: &FarmPoolAccount,
-    ) -> Result<()> {
+    fn calculate_reward_amount<'info>(&mut self, pool: &FarmPoolAccount) -> Result<()> {
         let pending_amount: u128 = u128::from(self.amount)
             .checked_mul(pool.acc_reward_per_share)
             .unwrap()
@@ -456,9 +467,20 @@ impl FarmPoolUserAccount {
         Ok(())
     }
     fn calculate_reward_debt<'info>(&mut self, pool: &FarmPoolAccount) -> Result<()> {
-
-        msg!("multiplied {}", u128::from(self.amount).checked_mul(pool.acc_reward_per_share).unwrap());
-        msg!("scaled {}", u128::from(self.amount).checked_mul(pool.acc_reward_per_share).unwrap().checked_div(YEAR_DURATION).unwrap());
+        msg!(
+            "multiplied {}",
+            u128::from(self.amount)
+                .checked_mul(pool.acc_reward_per_share)
+                .unwrap()
+        );
+        msg!(
+            "scaled {}",
+            u128::from(self.amount)
+                .checked_mul(pool.acc_reward_per_share)
+                .unwrap()
+                .checked_div(YEAR_DURATION)
+                .unwrap()
+        );
 
         self.reward_debt = u128::from(self.amount)
             .checked_mul(pool.acc_reward_per_share)
@@ -498,7 +520,7 @@ pub struct UserStaked {
     pool: Pubkey,
     user: Pubkey,
     authority: Pubkey,
-    amount: u64
+    amount: u64,
 }
 #[event]
 pub struct UserUnstaked {

@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-solana_spltoken_staking = "3fKWJqNzcLmrDVETM7AELXuPd1N21syu8EsoaUgnoLa4"
+solana_spltoken_staking = "9YLTnX9cPzkJZM8eCF9kZQmqtz7eAHXdBFFs3yo8Johu"
 
 [registry]
 url = "https://api.apr.dev"

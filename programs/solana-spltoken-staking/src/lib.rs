@@ -5,11 +5,24 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::mem::size_of;
 
-declare_id!("9YLTnX9cPzkJZM8eCF9kZQmqtz7eAHXdBFFs3yo8Johu");
+declare_id!("UTgee88yipRjMWxriEotNuRY8AFznBzasuCE7XtGUpK");
 
-const YEAR_DURATION: u128 = 60;
+const YEAR_DURATION: u128 = 3600 * 365 * 24;
+
+// 3 month
+// const APY: u128 = 25; //this mean 25 %
+// const LOCK_TIME: u128 = 3 * 30 * 24 * 3600;
+// const LOCK_TIME: u128 = 180;
+
+// 2 month
+// const APY: u128 = 20; //this mean 20 %
+// const LOCK_TIME: u128 = 2 * 30 * 24 * 3600;
+// const LOCK_TIME: u128 = 120;
+
+// // // 1 month
 const APY: u128 = 15; //this mean 15 %
-const LOCK_TIME: u128 = 120;
+const LOCK_TIME: u128 = 1 * 30 * 24 * 3600;
+// const LOCK_TIME: u128 = 60;
 
 #[program]
 pub mod solana_spltoken_staking {
@@ -78,6 +91,18 @@ pub mod solana_spltoken_staking {
         msg!("create_user_done");
         Ok(())
     }
+
+    // pub fn withdraw_reward_token(_ctx: Context<REFund>, amount: u64) -> Result<()> {
+    //     let cpi_accounts = Transfer {
+    //         from: _ctx.accounts.reward_vault.to_account_info(),
+    //         to: _ctx.accounts.user_vault.to_account_info(),
+    //         authority: _ctx.accounts.authority.to_account_info(),
+    //     };
+    //     let cpi_program = _ctx.accounts.token_program.to_account_info();
+    //     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, );
+    //     token::transfer(cpi_ctx, amount)?;
+    //     Ok(())
+    // }
 
     pub fn stake(_ctx: Context<Stake>, amount: u64) -> Result<()> {
         msg!("stake_start");
@@ -306,6 +331,19 @@ pub struct Fund<'info> {
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>,
 }
+// #[derive(Accounts)]
+// pub struct REFund<'info> {
+//     #[account(mut, seeds = [b"state".as_ref()], bump = state.bump)]
+//     pub state: Account<'info, StateAccount>,
+//     #[account(mut)]
+//     pub authority: Signer<'info>,
+//     #[account(mut, constraint = reward_vault.owner == state.key())]
+//     pub reward_vault: Box<Account<'info, TokenAccount>>,
+//     #[account(mut, constraint = user_vault.owner == authority.key())]
+//     pub user_vault: Box<Account<'info, TokenAccount>>,
+//     #[account(constraint = token_program.key == &token::ID)]
+//     pub token_program: Program<'info, Token>,
+// }
 
 #[derive(Accounts)]
 pub struct CreatePoolUser<'info> {
